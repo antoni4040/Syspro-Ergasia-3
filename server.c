@@ -30,7 +30,7 @@ int main(int argc, char* argv[])
     // Setup socket:
     int serverSocket;
     struct sockaddr_in server;
-    struct sockaddr *serverptr =(struct sockaddr  *)&server;
+    struct sockaddr *serverptr =(struct sockaddr*)&server;
 
     if((serverSocket = socket(AF_INET , SOCK_STREAM , 0)) < 0)
     {
@@ -55,10 +55,20 @@ int main(int argc, char* argv[])
     }
     printf("Listening  for  connections  to port %d\n", port);
 
+    // Setup new socket for connection:
+    int newSocket;
+    struct sockaddr_in client;
+    socklen_t  clientlen;
+    struct sockaddr *clientptr =(struct sockaddr*)&client;
+
     // Listen for client requests:
     while(1)
     {
-
+        if((newSocket = accept(serverSocket, clientptr, &clientlen)) < 0) 
+        {
+            perror("Error accepting connection.");
+            exit(EXIT_FAILURE);
+        }
     }
 
     return 0;
