@@ -10,11 +10,29 @@
         "args": [
           "-g",
           "server.c",
+          "-o",
+          "server",
         ],
         "group": {
           "kind": "build",
           "isDefault": true
         }
-      }
+      },
+      // {
+      //   "label": "build project",
+      //   "type": "shell",
+      //   "command": "gcc",
+      //   "args": [
+      //     "-g",
+      //     "client.c",
+      //     "-o",
+      //     "client"
+      //   ],
+      //   "group": {
+      //     "kind": "build",
+      //     "isDefault": true
+      //   },
+      //   "problemMatcher": []
+      // }
     ]
   }

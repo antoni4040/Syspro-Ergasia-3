@@ -14,7 +14,6 @@
 
 typedef struct client
 {
-    int socket;
     int clientPort;
     struct sockaddr clientPtr;
 } client;

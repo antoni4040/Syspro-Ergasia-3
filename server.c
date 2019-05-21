@@ -8,7 +8,9 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 
-int main(int argc, char* argv[])
+#include <unistd.h>
+
+int main(int argc, char** argv)
 {
     int port;
     if(argc != 3)
@@ -69,6 +71,17 @@ int main(int argc, char* argv[])
             perror("Error accepting connection.");
             exit(EXIT_FAILURE);
         }
+        printf("Accepted connection.\n");
+        char buffer[256];
+        if((recvfrom(newSocket, buffer, sizeof(buffer), 0, clientptr , &clientlen)) < 0)
+        {
+            perror("Error in recvfrom.");
+            exit(EXIT_FAILURE);
+        }
+        buffer[sizeof(buffer) - 1] = '\0';
+        printf("%s\n", buffer);
+        close(newSocket);
+        printf("Closed connection.\n");            
     }
 
     return 0;
