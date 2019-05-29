@@ -10,3 +10,7 @@
 \.vscode/ipch/ce6a5abbc0dc5123/
 
 \.vscode/ipch/bd2863380142c746/
+
+*.bin
+
+*.ipch

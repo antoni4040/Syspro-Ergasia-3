@@ -62,24 +62,39 @@ void freeLinkedList(LinkedList* linkedList)
     free(linkedList);
 }
 
+// Return size of a linked list:
+int linkedListSize(LinkedList* linkedList)
+{
+    int size = 0;
+    Node* node = linkedList->head;
+    while(node != NULL)
+    {
+        size++;
+        node = node->next;
+    }
+    return size;
+}
+
 // Client part:
 
 // Initialize a client struct to put in a linked list node:
-client* initializeClient(unsigned long int id)
+Client* initializeClient(int16_t port, int32_t ip)
 {
-    client* newClient = malloc(sizeof(client));
-    newClient->id = id;
+    Client* newClient = malloc(sizeof(Client));
+    newClient->clientPort = port;
+    newClient->clientIP = ip;
     return newClient;
 }
 
-// Check if a client id already exists in the clients linked list:
-int checkClientInLinkedList(unsigned long int id, LinkedList* linkedList)
+// Check if a client ip and port already exists in the clients linked list:
+int checkClientInLinkedList(LinkedList* linkedList, int16_t port, int32_t ip)
 {
     int idFound = 1;
     Node* node = linkedList->head;
     while(node != NULL)
     {
-        if(((client*)(node->item))->id == id)
+        if(((Client*)(node->item))->clientIP == ip && 
+            ((Client*)(node->item))->clientPort == port)
         {
             idFound = 0;
             break;

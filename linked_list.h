@@ -14,9 +14,9 @@
 
 typedef struct client
 {
-    int clientPort;
-    struct sockaddr clientPtr;
-} client;
+    int16_t clientPort;
+    int32_t clientIP;
+} Client;
 
 typedef struct Node
 {
@@ -37,8 +37,9 @@ LinkedList* initializeLinkedList();
 void appendToLinkedList(LinkedList* linkedList, Node* node);
 void freeLinkedList(LinkedList* linkedList);
 Node* popStart(LinkedList* linkedList);
+int linkedListSize(LinkedList* linkedList);
 
 // Client part:
-client* initializeClient(unsigned long int id);
-int checkClientInLinkedList(unsigned long int id, LinkedList* linkedList);
+Client* initializeClient(int16_t port, int32_t clientIP);
+int checkClientInLinkedList(LinkedList* linkedList, int16_t port, int32_t ip);
 #endif //ERGASIA_1_LINKEDLIST_H

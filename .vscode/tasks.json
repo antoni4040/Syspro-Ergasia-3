@@ -10,29 +10,50 @@
         "args": [
           "-g",
           "server.c",
+          "linked_list.c",
+          "requests.c"
           "-o",
-          "server",
+          "server"
         ],
         "group": {
           "kind": "build",
           "isDefault": true
         }
       },
-      // {
-      //   "label": "build project",
-      //   "type": "shell",
-      //   "command": "gcc",
-      //   "args": [
-      //     "-g",
-      //     "client.c",
-      //     "-o",
-      //     "client"
-      //   ],
-      //   "group": {
-      //     "kind": "build",
-      //     "isDefault": true
-      //   },
-      //   "problemMatcher": []
-      // }
+      {
+        "label": "build project 2",
+        "type": "shell",
+        "command": "gcc",
+        "args": [
+          "-g",
+          "client.c",
+          "linked_list.c",
+          "requests.c",
+          "-o",
+          "client"
+        ],
+        "group": {
+          "kind": "build",
+          "isDefault": true
+        },
+        "problemMatcher": []
+      },
+      {
+        "type": "shell",
+        "label": "debug client",
+        "command": "/usr/bin/gcc",
+        "args": [
+          "-g",
+          "${file}",
+          "-o",
+          "${fileDirname}/${fileBasenameNoExtension}"
+        ],
+        "options": {
+          "cwd": "/usr/bin"
+        },
+        "problemMatcher": [
+          "$gcc"
+        ]
+      }
     ]
   }

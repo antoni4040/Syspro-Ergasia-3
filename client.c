@@ -7,11 +7,14 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <arpa/inet.h>
 #include <netdb.h>
+
+#include <unistd.h>
 
 int main(int argc, char** argv)
 {
-    char* dirname;
+    char *dirname, *serverIPString;
     int port, workerThreads, bufferSize, serverPort;
 
     for(int i = 0; i < argc; i++)
@@ -47,6 +50,13 @@ int main(int argc, char** argv)
             i++;
             serverPort = atoi(argv[i]);
         }
+        // Get server IP:
+        if(strcmp(argv[i], "-sip") == 0)
+        {
+            i++;
+            serverIPString = malloc(strlen(argv[i]) * sizeof(char));
+            strcpy(serverIPString, argv[i]);
+        }
     }
 
     int clientSocket;
@@ -61,14 +71,46 @@ int main(int argc, char** argv)
         exit(EXIT_FAILURE);
     }
 
+
     server.sin_family = AF_INET;
     memcpy(&server.sin_addr, rem->h_addr_list[0], rem->h_length);
+    server.sin_port = htons(serverPort);
+
+    // Convert ip string to binary:
+    uint32_t address;
+    inet_pton(AF_INET, serverIPString, &address);
+    // Convert ip to network order:
+    address = htonl(address);
+    // Make it a string:
+    char* addressString = malloc(8 * sizeof(char));
+    sprintf(addressString, "%x", address);
+
+    // Convert ip to network order:
+    uint16_t portBinary = htons(port);
+    // Make it a string:
+    char* portString = malloc(4 * sizeof(char));
+    sprintf(portString, "%x", portBinary);
 
     // Initialize connection:
     if(connect(clientSocket, serverptr ,sizeof(server)) < 0)
     {
         perror("Error connecting.");
+        exit(EXIT_FAILURE);
     }
+
+    // Inform server about our existence:
+    char logOnRequest[1024];
+    strcpy(logOnRequest, "LOG_ON ");
+    strcat(logOnRequest, addressString);
+    strcat(logOnRequest, " ");
+    strcat(logOnRequest, portString);
+    strcat(logOnRequest, " ");
+
+    // Ask for connected clients:
+    strcat(logOnRequest, "GET_CLIENTS");
+
+    // printf("%s\n", logOnRequest);
+    send(clientSocket, logOnRequest, 1024, 0);
 
     return 0;
 }
