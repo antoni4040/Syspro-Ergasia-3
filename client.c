@@ -12,6 +12,9 @@
 
 #include <unistd.h>
 
+#include "linked_list.h"
+#include "requests.h"
+
 int main(int argc, char** argv)
 {
     char *dirname, *serverIPString;
@@ -59,22 +62,14 @@ int main(int argc, char** argv)
         }
     }
 
-    int clientSocket;
-    struct sockaddr_in  server;
-    struct sockaddr *serverptr = (struct sockaddr*)&server;
-    struct hostent *rem = gethostbyname("localhost");
+    // int clientSocket;
+    // struct sockaddr_in  client;
+    // struct sockaddr *clientptr = (struct sockaddr*)&client;
+    // struct hostent *rem = gethostbyname("localhost");
 
-    // Create socket:
-    if((clientSocket = socket(AF_INET , SOCK_STREAM , 0)) < 0)
-    {
-        perror("Error creating socket.");
-        exit(EXIT_FAILURE);
-    }
-
-
-    server.sin_family = AF_INET;
-    memcpy(&server.sin_addr, rem->h_addr_list[0], rem->h_length);
-    server.sin_port = htons(serverPort);
+    // client.sin_family = AF_INET;
+    // memcpy(&client.sin_addr, rem->h_addr_list[0], rem->h_length);
+    // client.sin_port = htons(serverPort);
 
     // Convert ip string to binary:
     uint32_t address;
@@ -91,10 +86,20 @@ int main(int argc, char** argv)
     char* portString = malloc(4 * sizeof(char));
     sprintf(portString, "%x", portBinary);
 
+    Socket* clientSocket = initializeSocket(serverPort, address);
+
+    // // Create socket:
+    // if((clientSocket = socket(AF_INET , SOCK_STREAM , 0)) < 0)
+    // {
+    //     perror("Error creating socket.");
+    //     exit(EXIT_FAILURE);
+    // }
+
+
     // Initialize connection:
-    if(connect(clientSocket, serverptr ,sizeof(server)) < 0)
+    if(connect(clientSocket->socket, (struct sockaddr*)&clientSocket->socketAddress ,sizeof(clientSocket->socketAddress)) < 0)
     {
-        perror("Error connecting.");
+        perror("Error connecting client to server.");
         exit(EXIT_FAILURE);
     }
 
@@ -107,10 +112,57 @@ int main(int argc, char** argv)
     strcat(logOnRequest, " ");
 
     // Ask for connected clients:
-    strcat(logOnRequest, "GET_CLIENTS");
+    strcat(logOnRequest, "GET_CLIENTS ");
+    strcat(logOnRequest, addressString);
+    strcat(logOnRequest, " ");
+    strcat(logOnRequest, portString);
+    strcat(logOnRequest, " ");
 
-    // printf("%s\n", logOnRequest);
-    send(clientSocket, logOnRequest, 1024, 0);
+    // Send initial request for login and get clients:
+    send(clientSocket->socket, logOnRequest, 1024, 0);
+    close(clientSocket->socket);
+
+    // Setup server socket:
+    Socket* serverSocket = initializeSocket(port, INADDR_ANY);
+    printf("client port aa: %d\n", serverSocket->socketAddress.sin_port);
+    
+    char* buffer = malloc((serverSocket->socketSize+1) * sizeof(char));
+
+    if(bind(serverSocket->socket, (struct sockaddr*)&serverSocket->socketAddress, sizeof(serverSocket->socketAddress)) < 0)
+    {
+        perror("Error binding client socket.");
+        exit(EXIT_FAILURE);
+    }
+
+    // Shut-up and LISTEN:
+    if(listen(serverSocket->socket, 5) < 0)
+    {
+        perror("Error listening to port.");
+        exit(EXIT_FAILURE);
+    }
+
+    // Setup new socket for connection:
+    Socket* newSocket = malloc(sizeof(Socket));
+    socklen_t socklen;
+
+    // Listen for client requests:
+    while(1)
+    {
+        // Accept client connection:
+        if((newSocket->socket = accept(serverSocket->socket, (struct sockaddr*)&newSocket->socketAddress, &socklen)) < 0) 
+        {
+            perror("Error accepting connection.");
+            exit(EXIT_FAILURE);
+        }
+        // Receive request:
+        if((recv(newSocket->socket, buffer, serverSocket->socketSize, 0)) < 0)
+        {
+            perror("Error in recvfrom.");
+            exit(EXIT_FAILURE);
+        }
+        printf("Client buffer: %s\n", buffer);
+        close(newSocket->socket);
+    }
 
     return 0;
 }

@@ -14,6 +14,13 @@
 #include <unistd.h>
 
 #include "linked_list.h"
-int sendClientList(int clientSocket, LinkedList* clientList, int size);
 
+typedef struct Socket{
+    int socket;
+    struct sockaddr_in socketAddress;
+    int socketSize;
+}Socket;
+
+Socket* initializeSocket(uint16_t port, uint32_t ip);
+int sendClientList(Socket* clientSocket, LinkedList* clientList, int size);
 #endif //ERGASIA_3_REQUESTS_H

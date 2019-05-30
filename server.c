@@ -38,36 +38,19 @@ int main(int argc, char** argv)
     LinkedList* clientList = initializeLinkedList();
 
     // Setup socket:
-    int serverSocket;
-    struct sockaddr_in server;
-    struct sockaddr *serverptr =(struct sockaddr*)&server;
+    Socket* serverSocket = initializeSocket(port, INADDR_ANY);
+    
+    char* buffer = malloc((serverSocket->socketSize+1) * sizeof(char));
 
-    if((serverSocket = socket(AF_INET , SOCK_STREAM , 0)) < 0)
+
+    if(bind(serverSocket->socket, (struct sockaddr *) &serverSocket->socketAddress, sizeof(serverSocket->socketAddress)) < 0)
     {
-        perror("Error creating socket.");
-        exit(EXIT_FAILURE);
-    }
-
-    // Set socket options:
-    int size;
-    unsigned int socklen = sizeof(size);
-    getsockopt(serverSocket, SOL_SOCKET, SO_RCVBUF, &size, &socklen);
-    setsockopt(serverSocket, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int));
-    printf("buffer size %d\n", size);
-    char* buffer = malloc((size+1) * sizeof(char));
-
-    server.sin_family = AF_INET;
-    server.sin_addr.s_addr = htonl(INADDR_ANY);
-    server.sin_port = htons(port);
-
-    if(bind(serverSocket , serverptr, sizeof(server)) < 0)
-    {
-        perror("Error binding socket.");
+        perror("Error binding server socket.");
         exit(EXIT_FAILURE);
     }
 
     // Shut-up and LISTEN:
-    if(listen(serverSocket , 5) < 0)
+    if(listen(serverSocket->socket, 5) < 0)
     {
         perror("Error listening to port.");
         exit(EXIT_FAILURE);
@@ -75,17 +58,15 @@ int main(int argc, char** argv)
     printf("Listening  for  connections  to port %d\n", port);
 
     // Setup new socket for connection:
-    int newSocket;
-    struct sockaddr_in client;
-    socklen_t  clientlen;
-    struct sockaddr *clientptr =(struct sockaddr*)&client;
+    Socket* newSocket = malloc(sizeof(newSocket));
+    socklen_t socklen;
     char* requestString;
 
     // Listen for client requests:
     while(1)
     {
         // Accept client connection:
-        if((newSocket = accept(serverSocket, clientptr, &clientlen)) < 0) 
+        if((newSocket->socket = accept(serverSocket->socket, (struct sockaddr*)&newSocket->socketAddress, &socklen)) < 0) 
         {
             perror("Error accepting connection.");
             exit(EXIT_FAILURE);
@@ -93,12 +74,13 @@ int main(int argc, char** argv)
         printf("Accepted connection.\n");
 
         // Receive request:
-        if((recv(newSocket, buffer, size, 0)) < 0)
+        if((recv(newSocket->socket, buffer, serverSocket->socketSize, 0)) < 0)
         {
             perror("Error in recvfrom.");
             exit(EXIT_FAILURE);
         }
-        printf("buffer: %s\n", buffer);
+        close(newSocket->socket);
+        // printf("buffer: %s\n", buffer);
 
         char* bufferCopy = buffer;
         while((requestString = strtok(bufferCopy, " ")) != NULL)
@@ -135,11 +117,17 @@ int main(int argc, char** argv)
             else if(strcmp(requestString, "GET_CLIENTS") == 0)
             {
                 printf("GET_CLIENTS request received.\n");
-                char clientIP[INET_ADDRSTRLEN]; 
-                inet_ntop(AF_INET, &client.sin_addr, clientIP, INET_ADDRSTRLEN);
-                int clientPort = ntohs(client.sin_port);
-                printf("Client ip: %s Client port: %d\n", clientIP, clientPort);
-                sendClientList(1, clientList, size);
+                // Get partner ip and listening port:
+                char* IPString = strtok(NULL, " ");
+                char* PortString = strtok(NULL, " ");
+                uint32_t partnerIP = strtol(IPString, NULL, 16);
+                // partnerIP = ntohl(partnerIP);
+                uint16_t partnerPort = strtol(PortString, NULL, 16);
+                partnerPort = ntohs(partnerPort);
+                printf("partner port: %d\n", htons(partnerPort));
+                Socket* sendListSocket = initializeSocket(partnerPort, partnerIP);
+                sendClientList(sendListSocket, clientList, sendListSocket->socketSize);
+                close(sendListSocket->socket);
             }
             // LOG_OFF request:
             else if(strcmp(requestString, "LOG_OFF") == 0)
@@ -148,10 +136,8 @@ int main(int argc, char** argv)
             }
             bufferCopy = NULL;
         }
-        close(newSocket);
         printf("Closed connection.\n");            
     }
-
     free(buffer);
     return 0;
 }

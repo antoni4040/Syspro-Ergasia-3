@@ -84,9 +84,10 @@ for i in range(numOfClients):
         [
             "./" +
             client_executable, "-p", str(newPort), "-sp", str(port), "-sip",
-            "192.168.2.4"
+            "192.168.1.7"
         ])
     )
+    time.sleep(1)
     ID += 1
 
 for i in processes:
