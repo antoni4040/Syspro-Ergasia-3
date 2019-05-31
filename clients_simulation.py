@@ -83,8 +83,8 @@ for i in range(numOfClients):
     processes.append(subprocess.Popen(
         [
             "./" +
-            client_executable, "-p", str(newPort), "-sp", str(port), "-sip",
-            "192.168.1.7"
+            client_executable, "-d", "./dir1", "-w", "5", "-b", "30", "-p", str(newPort), "-sp", str(port), "-sip",
+            "192.168.2.4"
         ])
     )
     time.sleep(1)

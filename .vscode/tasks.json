@@ -11,7 +11,7 @@
           "-g",
           "server.c",
           "linked_list.c",
-          "requests.c"
+          "requests.c",
           "-o",
           "server"
         ],
@@ -29,6 +29,8 @@
           "client.c",
           "linked_list.c",
           "requests.c",
+          "threads.c",
+          "-lpthread",
           "-o",
           "client"
         ],

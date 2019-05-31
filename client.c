@@ -14,6 +14,7 @@
 
 #include "linked_list.h"
 #include "requests.h"
+#include "threads.h"
 
 int main(int argc, char** argv)
 {
@@ -62,14 +63,8 @@ int main(int argc, char** argv)
         }
     }
 
-    // int clientSocket;
-    // struct sockaddr_in  client;
-    // struct sockaddr *clientptr = (struct sockaddr*)&client;
-    // struct hostent *rem = gethostbyname("localhost");
-
-    // client.sin_family = AF_INET;
-    // memcpy(&client.sin_addr, rem->h_addr_list[0], rem->h_length);
-    // client.sin_port = htons(serverPort);
+    // Create clients linked list:
+    LinkedList* clientList = initializeLinkedList();
 
     // Convert ip string to binary:
     uint32_t address;
@@ -87,14 +82,6 @@ int main(int argc, char** argv)
     sprintf(portString, "%x", portBinary);
 
     Socket* clientSocket = initializeSocket(serverPort, address);
-
-    // // Create socket:
-    // if((clientSocket = socket(AF_INET , SOCK_STREAM , 0)) < 0)
-    // {
-    //     perror("Error creating socket.");
-    //     exit(EXIT_FAILURE);
-    // }
-
 
     // Initialize connection:
     if(connect(clientSocket->socket, (struct sockaddr*)&clientSocket->socketAddress ,sizeof(clientSocket->socketAddress)) < 0)
@@ -144,8 +131,15 @@ int main(int argc, char** argv)
     // Setup new socket for connection:
     Socket* newSocket = malloc(sizeof(Socket));
     socklen_t socklen;
+    char* requestString;
 
-    // Listen for client requests:
+    // Initialize round buffer:
+    roundBuffer* threadRoundBuffer = initializeRoundBuffer(bufferSize);
+
+    // Initialize threadpool:
+    Threadpool* threads = initializeThreadpool(workerThreads, threadRoundBuffer);
+
+    // Start accepting requests:
     while(1)
     {
         // Accept client connection:
@@ -162,6 +156,62 @@ int main(int argc, char** argv)
         }
         printf("Client buffer: %s\n", buffer);
         close(newSocket->socket);
+
+        // Get clients list from server:
+        char* bufferCopy = buffer;
+        while((requestString = strtok(bufferCopy, " ")) != NULL)
+        {
+            // Client list information:
+            if(strcmp(requestString, "CLIENT_LIST") == 0)
+            {
+                printf("CLIENT_LIST response received.\n");
+                char* numString = strtok(NULL, " ");
+                int numOfClients = atoi(numString);
+                for(int i = 0; i < numOfClients; i++)
+                {
+                    // Get strings of binary represantation:
+                    char* IPString = strtok(NULL, " ");
+                    char* PortString = strtok(NULL, " ");
+
+                    // Convert them to 32bit and 16bit values:
+                    uint32_t clientIP = strtol(IPString, NULL, 16);
+                    clientIP = ntohl(clientIP);
+                    uint16_t clientPort = strtol(PortString, NULL, 16);
+                    clientPort = ntohs(clientPort);
+
+                    // Search for client in clients list:
+                    int found = checkClientInLinkedList(clientList, clientPort, clientIP);
+
+                    // If it doesn't exist, add client to list:
+                    if(found == 1)
+                    {
+                        Client* newClient = initializeClient(clientPort, clientIP);
+                        Node* newNode = initializeNode(newClient);
+                        appendToLinkedList(clientList, newNode);
+                        Item* newItem = initializeItem(NULL, 0, clientIP, clientPort);
+
+                        pthread_mutex_lock(&(threads->mutexLock));
+                        printf("\n  Gained lock to add item.\n");
+                        addToRoundBuffer(threadRoundBuffer, newItem);
+                        pthread_cond_broadcast(&(threads->mutexCond));
+                        pthread_mutex_unlock(&(threads->mutexLock));
+                    }
+                }
+            }
+            // Request to return list with pathnames:
+            else if(strcmp(requestString, "GET_FILE_LIST") == 0)
+            {
+                char* IPString = strtok(NULL, " ");
+                char* PortString = strtok(NULL, " ");
+                uint32_t partnerIP = strtol(IPString, NULL, 16);
+                uint16_t partnerPort = strtol(PortString, NULL, 16);
+                partnerPort = ntohs(partnerPort);
+                Socket* sendFileListSocket = initializeSocket(partnerPort, partnerIP);
+                sendFilesList(sendFileListSocket, dirname, serverSocket->socketSize);
+                close(sendFileListSocket->socket);
+            }
+            bufferCopy = NULL;
+        }        
     }
 
     return 0;

@@ -1,5 +1,6 @@
 #ifndef ERGASIA_3_REQUESTS_H
 #define ERGASIA_3_REQUESTS_H
+#define _DEFAULT_SOURCE
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -13,6 +14,8 @@
 
 #include <unistd.h>
 
+#include <dirent.h>
+
 #include "linked_list.h"
 
 typedef struct Socket{
@@ -23,4 +26,5 @@ typedef struct Socket{
 
 Socket* initializeSocket(uint16_t port, uint32_t ip);
 int sendClientList(Socket* clientSocket, LinkedList* clientList, int size);
+int sendFilesList(Socket* clientSocket, char* dirname, int size);
 #endif //ERGASIA_3_REQUESTS_H

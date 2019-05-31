@@ -3,5 +3,6 @@
         "in.h": "c",
         "socket.h": "c",
         "threads.h": "c"
-    }
+    },
+    "C_Cpp.errorSquiggles": "Disabled"
 }

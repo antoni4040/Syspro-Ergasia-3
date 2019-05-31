@@ -136,7 +136,7 @@ int main(int argc, char** argv)
             }
             bufferCopy = NULL;
         }
-        printf("Closed connection.\n");            
+        printf("Closed connection.\n");    
     }
     free(buffer);
     return 0;
