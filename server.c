@@ -25,7 +25,7 @@ int main(int argc, char** argv)
     }
     if(strcmp(argv[1], "-p") == 0)
     {
-        port = atoi(argv[2]);
+        port = ntohs(atoi(argv[2]));
     }
     else
     {
@@ -68,7 +68,7 @@ int main(int argc, char** argv)
         // Accept client connection:
         if((newSocket->socket = accept(serverSocket->socket, (struct sockaddr*)&newSocket->socketAddress, &socklen)) < 0) 
         {
-            perror("Error accepting connection.");
+            perror("Error accepting server connection.");
             exit(EXIT_FAILURE);
         }
         printf("Accepted connection.\n");
@@ -95,9 +95,9 @@ int main(int argc, char** argv)
 
                 // Convert them to 32bit and 16bit values:
                 uint32_t ip = strtol(IPString, NULL, 16);
-                ip = ntohl(ip);
+                // ip = ntohl(ip);
                 uint16_t port = strtol(PortString, NULL, 16);
-                port = ntohs(port);
+                // port = ntohs(port);
                 // Search for client in clients list:
                 int found = checkClientInLinkedList(clientList, port, ip);
 
@@ -123,8 +123,8 @@ int main(int argc, char** argv)
                 uint32_t partnerIP = strtol(IPString, NULL, 16);
                 // partnerIP = ntohl(partnerIP);
                 uint16_t partnerPort = strtol(PortString, NULL, 16);
-                partnerPort = ntohs(partnerPort);
-                printf("partner port: %d\n", htons(partnerPort));
+                // partnerPort = ntohs(partnerPort);
+                // printf("partner port: %d\n", htons(partnerPort));
                 Socket* sendListSocket = initializeSocket(partnerPort, partnerIP);
                 sendClientList(sendListSocket, clientList, sendListSocket->socketSize);
                 close(sendListSocket->socket);

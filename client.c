@@ -34,7 +34,7 @@ int main(int argc, char** argv)
         if(strcmp(argv[i], "-p") == 0)
         {
             i++;
-            port = atoi(argv[i]);
+            port = ntohs(atoi(argv[i]));
         }
         // Get worker threads:
         if(strcmp(argv[i], "-w") == 0)
@@ -52,7 +52,7 @@ int main(int argc, char** argv)
         if(strcmp(argv[i], "-sp") == 0)
         {
             i++;
-            serverPort = atoi(argv[i]);
+            serverPort = ntohs(atoi(argv[i]));
         }
         // Get server IP:
         if(strcmp(argv[i], "-sip") == 0)
@@ -70,16 +70,16 @@ int main(int argc, char** argv)
     uint32_t address;
     inet_pton(AF_INET, serverIPString, &address);
     // Convert ip to network order:
-    address = htonl(address);
+    address = ntohl(address);
     // Make it a string:
     char* addressString = malloc(8 * sizeof(char));
     sprintf(addressString, "%x", address);
 
     // Convert ip to network order:
-    uint16_t portBinary = htons(port);
+    // uint16_t portBinary = htons(port);
     // Make it a string:
     char* portString = malloc(4 * sizeof(char));
-    sprintf(portString, "%x", portBinary);
+    sprintf(portString, "%x", port);
 
     Socket* clientSocket = initializeSocket(serverPort, address);
 
@@ -110,7 +110,7 @@ int main(int argc, char** argv)
     close(clientSocket->socket);
 
     // Setup server socket:
-    Socket* serverSocket = initializeSocket(port, INADDR_ANY);
+    Socket* serverSocket = initializeSocket(port, address);
     printf("client port aa: %d\n", serverSocket->socketAddress.sin_port);
     
     char* buffer = malloc((serverSocket->socketSize+1) * sizeof(char));
@@ -137,7 +137,7 @@ int main(int argc, char** argv)
     roundBuffer* threadRoundBuffer = initializeRoundBuffer(bufferSize);
 
     // Initialize threadpool:
-    Threadpool* threads = initializeThreadpool(workerThreads, threadRoundBuffer);
+    Threadpool* threads = initializeThreadpool(workerThreads, threadRoundBuffer, address, serverPort, clientList);
 
     // Start accepting requests:
     while(1)
@@ -145,7 +145,7 @@ int main(int argc, char** argv)
         // Accept client connection:
         if((newSocket->socket = accept(serverSocket->socket, (struct sockaddr*)&newSocket->socketAddress, &socklen)) < 0) 
         {
-            perror("Error accepting connection.");
+            perror("Error accepting client connection.");
             exit(EXIT_FAILURE);
         }
         // Receive request:
@@ -175,9 +175,9 @@ int main(int argc, char** argv)
 
                     // Convert them to 32bit and 16bit values:
                     uint32_t clientIP = strtol(IPString, NULL, 16);
-                    clientIP = ntohl(clientIP);
+                    // clientIP = ntohl(clientIP);
                     uint16_t clientPort = strtol(PortString, NULL, 16);
-                    clientPort = ntohs(clientPort);
+                    // clientPort = ntohs(clientPort);
 
                     // Search for client in clients list:
                     int found = checkClientInLinkedList(clientList, clientPort, clientIP);
@@ -192,8 +192,8 @@ int main(int argc, char** argv)
 
                         pthread_mutex_lock(&(threads->mutexLock));
                         printf("\n  Gained lock to add item.\n");
-                        addToRoundBuffer(threadRoundBuffer, newItem);
-                        pthread_cond_broadcast(&(threads->mutexCond));
+                        addToRoundBuffer(threadRoundBuffer, newItem, threads);
+                        pthread_cond_signal(&(threads->mutexCond));
                         pthread_mutex_unlock(&(threads->mutexLock));
                     }
                 }
@@ -205,10 +205,60 @@ int main(int argc, char** argv)
                 char* PortString = strtok(NULL, " ");
                 uint32_t partnerIP = strtol(IPString, NULL, 16);
                 uint16_t partnerPort = strtol(PortString, NULL, 16);
-                partnerPort = ntohs(partnerPort);
+                // partnerPort = ntohs(partnerPort);
                 Socket* sendFileListSocket = initializeSocket(partnerPort, partnerIP);
-                sendFilesList(sendFileListSocket, dirname, serverSocket->socketSize);
+                sendFilesList(sendFileListSocket, dirname, serverSocket->socketSize, address, port);
                 close(sendFileListSocket->socket);
+            }
+            // Get files and add them to the round buffer:
+            else if(strcmp(requestString, "FILE_LIST") == 0)
+            {
+                char* IPString = strtok(NULL, " ");
+                char* PortString = strtok(NULL, " ");
+                uint32_t partnerIP = strtol(IPString, NULL, 16);
+                uint16_t partnerPort = strtol(PortString, NULL, 16);
+                // partnerPort = ntohs(partnerPort);
+                // partnerIP = ntohl(partnerIP);
+                char* numString = strtok(NULL, " ");
+                int numOfFiles = atoi(numString);
+                for(int i = 0; i < numOfFiles; i++)
+                {
+                    char* filename = strtok(NULL, " ");
+                    char* versionString = strtok(NULL, " ");
+                    int version = atoi(versionString);
+
+                    Item* newItem = initializeItem(filename, version, partnerIP, partnerPort);
+
+                    pthread_mutex_lock(&(threads->mutexLock));
+                    printf("\n  Gained lock to add item.\n");
+                    addToRoundBuffer(threadRoundBuffer, newItem, threads);
+                    pthread_cond_signal(&(threads->mutexCond));
+                    pthread_mutex_unlock(&(threads->mutexLock));
+                }
+            }
+            // Request to return specific file:
+            else if(strcmp(requestString, "GET_FILE") == 0)
+            {
+                printf("\t\t\tGET_FILE request received!\n");
+                char* IPString = strtok(NULL, " ");
+                char* PortString = strtok(NULL, " ");
+                char* fileToGet = strtok(NULL, " ");
+                uint32_t partnerIP = strtol(IPString, NULL, 16);
+                uint16_t partnerPort = strtol(PortString, NULL, 16);
+                // partnerPort = ntohs(partnerPort);
+                char* completeDir = malloc(strlen(dirname) + strlen(fileToGet) + 1);
+                strcpy(completeDir, dirname);
+                strcat(completeDir, "/");
+                strcat(completeDir, fileToGet);
+                Socket* sendFileSocket = initializeSocket(partnerPort, partnerIP);
+                sendFile(sendFileSocket, completeDir, serverSocket->socketSize, address, port);
+                close(sendFileSocket->socket);
+                free(completeDir);
+            }
+            // Get file data and create file:
+            else if(strcmp(requestString, "FILE") == 0)
+            {
+                
             }
             bufferCopy = NULL;
         }        

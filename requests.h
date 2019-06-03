@@ -11,6 +11,9 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <fcntl.h>
 
 #include <unistd.h>
 
@@ -26,5 +29,6 @@ typedef struct Socket{
 
 Socket* initializeSocket(uint16_t port, uint32_t ip);
 int sendClientList(Socket* clientSocket, LinkedList* clientList, int size);
-int sendFilesList(Socket* clientSocket, char* dirname, int size);
+int sendFilesList(Socket* clientSocket, char* dirname, int size, uint32_t ip, uint16_t port);
+int sendFile(Socket* clientSocket, char* dirname, int size, uint32_t ip, uint16_t port);
 #endif //ERGASIA_3_REQUESTS_H

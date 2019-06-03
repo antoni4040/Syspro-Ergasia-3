@@ -36,8 +36,8 @@ int sendClientList(Socket* clientSocket, LinkedList* clientList, int size)
     {
         Client* client = (Client*)(node->item);
         // Convert ip to network order:
-        uint32_t address;
-        address = htonl(client->clientIP);
+        uint32_t address = client->clientIP;
+        // address = htonl(client->clientIP);
         // Make it a string:
         char* addressString = malloc(8 * sizeof(char));
         sprintf(addressString, "%x", address);
@@ -45,17 +45,17 @@ int sendClientList(Socket* clientSocket, LinkedList* clientList, int size)
         strcat(buffer, " ");
 
         // Convert ip to network order:
-        uint16_t portBinary = htons(client->clientPort);
+        // uint16_t portBinary = htons(client->clientPort);
         // Make it a string:
         char* portString = malloc(4 * sizeof(char));
-        sprintf(portString, "%x", portBinary);
+        sprintf(portString, "%x", client->clientPort);
         strcat(buffer, portString);
         strcat(buffer, " ");
         node = node->next;
     }
     if(connect(clientSocket->socket, (struct sockaddr*)&clientSocket->socketAddress, sizeof(clientSocket->socketAddress)) < 0)
     {
-        perror("Error connecting to client.");
+        perror("1. Error connecting to client.");
         exit(EXIT_FAILURE);
     }
     printf("Buffer: %s Size: %d\n", buffer, size);
@@ -64,7 +64,7 @@ int sendClientList(Socket* clientSocket, LinkedList* clientList, int size)
     return 0;    
 }
 
-int sendFilesList(Socket* clientSocket, char* dirname, int size)
+int sendFilesList(Socket* clientSocket, char* dirname, int size, uint32_t ip, uint16_t port)
 {
     int numberOfFiles = 0;
 
@@ -131,9 +131,23 @@ int sendFilesList(Socket* clientSocket, char* dirname, int size)
     }
     free(toVisit);
 
-    // Initialize buffer with request text and number of files:
+    // Initialize buffer with request text, ip, port and number of files:
     char* buffer = malloc(size * sizeof(char));
     strcpy(buffer, "FILE_LIST ");
+
+    char* addressString = malloc(8 * sizeof(char));
+    sprintf(addressString, "%x", ip);
+    strcat(buffer, addressString);
+    strcat(buffer, " ");
+
+    // Convert ip to network order:
+    // uint16_t portBinary = htons(port);
+    // Make it a string:
+    char* portString = malloc(4 * sizeof(char));
+    sprintf(portString, "%x", port);
+    strcat(buffer, portString);
+    strcat(buffer, " ");
+
     char filesNumString[12];
     sprintf(filesNumString, "%d", numberOfFiles);
     strcat(buffer, " ");
@@ -153,7 +167,64 @@ int sendFilesList(Socket* clientSocket, char* dirname, int size)
     }
     free(files);
 
-    printf("Buffer Files: %s\n", buffer);
+    // printf("Buffer Files: %d %s\n", size, buffer);
+    if(connect(clientSocket->socket, (struct sockaddr*)&clientSocket->socketAddress, sizeof(clientSocket->socketAddress)) < 0)
+    {
+        perror("2. Error connecting to client.");
+        exit(EXIT_FAILURE);
+    }
+    send(clientSocket->socket, buffer, size, 0);
 
     return 0;
+}
+
+// Transfer give file:
+int sendFile(Socket* clientSocket, char* dirname, int size, uint32_t ip, uint16_t port)
+{
+    // Get filesize:
+    struct stat fileStat;
+    stat(dirname, &fileStat);
+    long contentSize = fileStat.st_size;
+
+    printf("\t\tTrying to send file: %s %d\n", dirname, contentSize);
+
+    // printf("Buffer Files: %d %s\n", size, buffer);
+    if(connect(clientSocket->socket, (struct sockaddr*)&clientSocket->socketAddress, sizeof(clientSocket->socketAddress)) < 0)
+    {
+        perror("3. Error connecting to client.");
+        exit(EXIT_FAILURE);
+    }
+    printf("\t\t\tHERE!\n");
+
+    char* buffer = malloc(size * sizeof(char));
+
+    strcpy(buffer, "FILE ");
+
+    char* addressString = malloc(8 * sizeof(char));
+    sprintf(addressString, "%x", ip);
+    strcat(buffer, addressString);
+    strcat(buffer, " ");
+
+    // Convert ip to network order:
+    // uint16_t portBinary = htons(port);
+    // Make it a string:
+    char* portString = malloc(4 * sizeof(char));
+    sprintf(portString, "%x", port);
+    strcat(buffer, portString);
+    strcat(buffer, " ");
+
+    char filesSizeString[12];
+    sprintf(filesSizeString, "%l", contentSize);
+    strcat(buffer, " ");
+    strcat(buffer, filesSizeString);
+
+    int openFile = open(dirname, O_RDONLY);
+
+    // Get file content:
+    int bytes;
+    while((bytes = read(openFile, buffer, size)))
+    {
+        printf("\t\t SENDING FILE DATA\n");
+        send(clientSocket->socket, buffer, size, 0);
+    }
 }
