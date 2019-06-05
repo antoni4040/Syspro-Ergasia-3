@@ -9,6 +9,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#include <sys/time.h>
 
 #include <unistd.h>
 
@@ -61,10 +62,14 @@ int main(int argc, char** argv)
     Socket* newSocket = malloc(sizeof(newSocket));
     socklen_t socklen;
     char* requestString;
+    fd_set socketSet;
 
     // Listen for client requests:
     while(1)
     {
+        FD_ZERO(&socketSet);
+        FD_SET(serverSocket->socket, &socketSet);
+        select(sizeof(socketSet)*8, &socketSet, NULL, NULL, NULL);
         // Accept client connection:
         if((newSocket->socket = accept(serverSocket->socket, (struct sockaddr*)&newSocket->socketAddress, &socklen)) < 0) 
         {

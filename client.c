@@ -5,6 +5,7 @@
 
 #include <sys/wait.h>
 #include <sys/types.h>
+#include <sys/time.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -137,6 +138,7 @@ int main(int argc, char** argv)
     Socket* newSocket = malloc(sizeof(Socket));
     socklen_t socklen;
     char* requestString;
+    fd_set socketSet;
 
     // Initialize round buffer:
     roundBuffer* threadRoundBuffer = initializeRoundBuffer(bufferSize);
@@ -147,6 +149,9 @@ int main(int argc, char** argv)
     // Start accepting requests:
     while(1)
     {
+        FD_ZERO(&socketSet);
+        FD_SET(serverSocket->socket, &socketSet);
+        select(sizeof(socketSet)*8, &socketSet, NULL, NULL, NULL);
         // bzero(buffer, serverSocket->socketSize);
         memset(buffer, 0, sizeof(char)*serverSocket->socketSize);
         // Accept client connection:

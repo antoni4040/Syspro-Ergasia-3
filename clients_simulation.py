@@ -84,7 +84,7 @@ for i in range(numOfClients):
         [
             "./" +
             client_executable, "-d", "./dir" + str(ID), "-w", "3", "-b", "100", "-p", str(newPort), "-sp", str(port), "-sip",
-            "192.168.2.4"
+            "172.16.121.1"
         ])
     )
     time.sleep(4)
