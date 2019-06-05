@@ -199,17 +199,17 @@ int sendFile(Socket* clientSocket, char* dirname, char* basedir, int size, uint3
 
     strcpy(buffer, "FILE ");
 
-    char* addressString = malloc(8 * sizeof(char));
-    sprintf(addressString, "%x", ip);
-    strcat(buffer, addressString);
-    strcat(buffer, " ");
-    shift += strlen(addressString) + 1;
+    // char* addressString = malloc(8 * sizeof(char));
+    // sprintf(addressString, "%x", ip);
+    // strcat(buffer, addressString);
+    // strcat(buffer, " ");
+    // shift += strlen(addressString) + 1;
 
-    char* portString = malloc(4 * sizeof(char));
-    sprintf(portString, "%x", port);
-    strcat(buffer, portString);
-    strcat(buffer, " ");
-    shift += strlen(portString) + 1;
+    // char* portString = malloc(4 * sizeof(char));
+    // sprintf(portString, "%x", port);
+    // strcat(buffer, portString);
+    // strcat(buffer, " ");
+    // shift += strlen(portString) + 1;
 
     strcat(buffer, dirname);
     strcat(buffer, " ");
@@ -231,15 +231,18 @@ int sendFile(Socket* clientSocket, char* dirname, char* basedir, int size, uint3
     send(clientSocket->socket, buffer, size, 0);
 
     // Get file content:
-    bzero(buffer, size);
+    // bzero(buffer, size);
+    memset(buffer, 0, sizeof(char)*size);
     int bytes;
     while((bytes = read(openFile, buffer, size)))
     {
         printf("\t\t SENDING FILE DATA\n");
         send(clientSocket->socket, buffer, size, 0);
-        bzero(buffer, size);
+        // bzero(buffer, size);
+        memset(buffer, 0, sizeof(char)*size);
     }
     close(openFile);
+    return 0;
 }
 
 // Create directory for new file:

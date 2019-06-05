@@ -147,7 +147,8 @@ int main(int argc, char** argv)
     // Start accepting requests:
     while(1)
     {
-        bzero(buffer, serverSocket->socketSize);
+        // bzero(buffer, serverSocket->socketSize);
+        memset(buffer, 0, sizeof(char)*serverSocket->socketSize);
         // Accept client connection:
         if((newSocket->socket = accept(serverSocket->socket, (struct sockaddr*)&newSocket->socketAddress, &socklen)) < 0) 
         {
@@ -263,14 +264,14 @@ int main(int argc, char** argv)
             // Get file data and create file:
             else if(strcmp(requestString, "FILE") == 0)
             {
-                char* IPString = strtok(NULL, " ");
-                char* PortString = strtok(NULL, " ");
+                // char* IPString = strtok(NULL, " ");
+                // char* PortString = strtok(NULL, " ");
                 char* fileToGet = strtok(NULL, " ");
                 printf("````````FILE TO GET:%s\n", fileToGet);
                 char* baseDir = strtok(NULL, " ");
                 char* fileSizeString = strtok(NULL, " ");
-                uint32_t partnerIP = strtol(IPString, NULL, 16);
-                uint16_t partnerPort = strtol(PortString, NULL, 16);
+                // uint32_t partnerIP = strtol(IPString, NULL, 16);
+                // uint16_t partnerPort = strtol(PortString, NULL, 16);
                 long fileSize = strtol(fileSizeString, NULL, 10);
                 createDirectory(dirname, fileToGet+(strlen(baseDir)+1));
                 int shift = 22 + strlen(fileToGet) + strlen(baseDir) + strlen(fileSizeString);
@@ -287,7 +288,7 @@ int main(int argc, char** argv)
 
                 while(fileSize >= 0)
                 {
-                    printf("SHIFT:%d %d %d %d\n", shift, strlen(fileToGet), strlen(baseDir), strlen(fileSizeString));
+                    // printf("SHIFT:%d %d %d %d\n", shift, strlen(fileToGet), strlen(baseDir), strlen(fileSizeString));
                     long bufferLen = serverSocket->socketSize - shift;
                     if(fileSize > bufferLen)
                     {
