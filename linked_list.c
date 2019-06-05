@@ -93,6 +93,7 @@ int checkClientInLinkedList(LinkedList* linkedList, int16_t port, int32_t ip)
     Node* node = linkedList->head;
     while(node != NULL)
     {
+        printf("~~~~ Comparing: %d %d\n", htons(((Client*)(node->item))->clientPort), htons(port));
         if(((Client*)(node->item))->clientIP == ip && 
             ((Client*)(node->item))->clientPort == port)
         {

@@ -81,6 +81,11 @@ int main(int argc, char** argv)
     char* portString = malloc(4 * sizeof(char));
     sprintf(portString, "%x", port);
 
+    // Add this client to the list:
+    Client* newClient = initializeClient(port, address);
+    Node* newNode = initializeNode(newClient);
+    appendToLinkedList(clientList, newNode);
+
     Socket* clientSocket = initializeSocket(serverPort, address);
 
     // Initialize connection:
@@ -137,11 +142,12 @@ int main(int argc, char** argv)
     roundBuffer* threadRoundBuffer = initializeRoundBuffer(bufferSize);
 
     // Initialize threadpool:
-    Threadpool* threads = initializeThreadpool(workerThreads, threadRoundBuffer, address, serverPort, clientList);
+    Threadpool* threads = initializeThreadpool(workerThreads, threadRoundBuffer, address, port, clientList);
 
     // Start accepting requests:
     while(1)
     {
+        bzero(buffer, serverSocket->socketSize);
         // Accept client connection:
         if((newSocket->socket = accept(serverSocket->socket, (struct sockaddr*)&newSocket->socketAddress, &socklen)) < 0) 
         {
@@ -154,8 +160,7 @@ int main(int argc, char** argv)
             perror("Error in recvfrom.");
             exit(EXIT_FAILURE);
         }
-        printf("Client buffer: %s\n", buffer);
-        close(newSocket->socket);
+        printf("Client buffer: Dir:%s\t\t\t%s\n", dirname, buffer);
 
         // Get clients list from server:
         char* bufferCopy = buffer;
@@ -185,6 +190,7 @@ int main(int argc, char** argv)
                     // If it doesn't exist, add client to list:
                     if(found == 1)
                     {
+                        printf("------Adding to rb: %d %d\n", htons(clientPort), htons(port));
                         Client* newClient = initializeClient(clientPort, clientIP);
                         Node* newNode = initializeNode(newClient);
                         appendToLinkedList(clientList, newNode);
@@ -193,8 +199,8 @@ int main(int argc, char** argv)
                         pthread_mutex_lock(&(threads->mutexLock));
                         printf("\n  Gained lock to add item.\n");
                         addToRoundBuffer(threadRoundBuffer, newItem, threads);
-                        pthread_cond_signal(&(threads->mutexCond));
                         pthread_mutex_unlock(&(threads->mutexLock));
+                        pthread_cond_broadcast(&(threads->mutexCond));
                     }
                 }
             }
@@ -232,14 +238,13 @@ int main(int argc, char** argv)
                     pthread_mutex_lock(&(threads->mutexLock));
                     printf("\n  Gained lock to add item.\n");
                     addToRoundBuffer(threadRoundBuffer, newItem, threads);
-                    pthread_cond_signal(&(threads->mutexCond));
                     pthread_mutex_unlock(&(threads->mutexLock));
+                    pthread_cond_broadcast(&(threads->mutexCond));
                 }
             }
             // Request to return specific file:
             else if(strcmp(requestString, "GET_FILE") == 0)
             {
-                printf("\t\t\tGET_FILE request received!\n");
                 char* IPString = strtok(NULL, " ");
                 char* PortString = strtok(NULL, " ");
                 char* fileToGet = strtok(NULL, " ");
@@ -251,15 +256,97 @@ int main(int argc, char** argv)
                 strcat(completeDir, "/");
                 strcat(completeDir, fileToGet);
                 Socket* sendFileSocket = initializeSocket(partnerPort, partnerIP);
-                sendFile(sendFileSocket, completeDir, serverSocket->socketSize, address, port);
+                sendFile(sendFileSocket, completeDir, dirname, serverSocket->socketSize, address, port);
                 close(sendFileSocket->socket);
                 free(completeDir);
             }
             // Get file data and create file:
             else if(strcmp(requestString, "FILE") == 0)
             {
+                char* IPString = strtok(NULL, " ");
+                char* PortString = strtok(NULL, " ");
+                char* fileToGet = strtok(NULL, " ");
+                printf("````````FILE TO GET:%s\n", fileToGet);
+                char* baseDir = strtok(NULL, " ");
+                char* fileSizeString = strtok(NULL, " ");
+                uint32_t partnerIP = strtol(IPString, NULL, 16);
+                uint16_t partnerPort = strtol(PortString, NULL, 16);
+                long fileSize = strtol(fileSizeString, NULL, 10);
+                createDirectory(dirname, fileToGet+(strlen(baseDir)+1));
+                int shift = 22 + strlen(fileToGet) + strlen(baseDir) + strlen(fileSizeString);
                 
+                // Open file with write permissions, create it if it doesn't exist, empty it if it already exists.
+                // Allow the user to read and write that file.
+                char* newFile = malloc(strlen(dirname)+strlen(fileToGet));
+                strcpy(newFile, dirname);
+                strcat(newFile, "/");
+                strcat(newFile, fileToGet+(strlen(baseDir)+1));
+                printf("````````NEW FILENAME:%s %s %s\n", newFile, fileToGet, fileSizeString);
+                int file = open(newFile, O_RDWR | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+                char* buffer2 = buffer + shift;
+
+                while(fileSize >= 0)
+                {
+                    printf("SHIFT:%d %d %d %d\n", shift, strlen(fileToGet), strlen(baseDir), strlen(fileSizeString));
+                    long bufferLen = serverSocket->socketSize - shift;
+                    if(fileSize > bufferLen)
+                    {
+                        if ((write(file, buffer2, bufferLen)) == -1)
+                        { 
+                            perror ("Error writing to file.");
+                            return 1;
+                        }
+                        // Receive request:
+                        if((recv(newSocket->socket, buffer, serverSocket->socketSize, 0)) < 0)
+                        {
+                            perror("Error in recvfrom.");
+                            exit(EXIT_FAILURE);
+                        }
+                    }
+                    else
+                    {
+                        if ((write(file, buffer2, fileSize)) == -1)
+                        { 
+                            perror ("Error writing to file.");
+                            return 1;
+                        }
+                    }
+                    fileSize -= bufferLen;
+                    shift = 0;
+                    buffer2 = buffer;
+                }
+                close(file);
             }
+            else if(strcmp(requestString, "USER_ON") == 0)
+            {
+                char* IPString = strtok(NULL, " ");
+                char* PortString = strtok(NULL, " ");
+                // Convert them to 32bit and 16bit values:
+                uint32_t clientIP = strtol(IPString, NULL, 16);
+                // clientIP = ntohl(clientIP);
+                uint16_t clientPort = strtol(PortString, NULL, 16);
+                // clientPort = ntohs(clientPort);
+
+                // Search for client in clients list:
+                int found = checkClientInLinkedList(clientList, clientPort, clientIP);
+
+                // If it doesn't exist, add client to list:
+                if(found == 1)
+                {
+                    // printf("------Adding to rb: %d %d\n", htons(clientPort), htons(port));
+                    Client* newClient = initializeClient(clientPort, clientIP);
+                    Node* newNode = initializeNode(newClient);
+                    appendToLinkedList(clientList, newNode);
+                    Item* newItem = initializeItem(NULL, 0, clientIP, clientPort);
+
+                    pthread_mutex_lock(&(threads->mutexLock));
+                    printf("\n  Gained lock to add item.\n");
+                    addToRoundBuffer(threadRoundBuffer, newItem, threads);
+                    pthread_mutex_unlock(&(threads->mutexLock));
+                    pthread_cond_broadcast(&(threads->mutexCond));
+                }
+            }
+            close(newSocket->socket);
             bufferCopy = NULL;
         }        
     }

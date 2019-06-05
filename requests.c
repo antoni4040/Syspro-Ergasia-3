@@ -74,6 +74,8 @@ int sendFilesList(Socket* clientSocket, char* dirname, int size, uint32_t ip, ui
     char* firstDirName = malloc(sizeof(char) * strlen(dirname));
     strcpy(firstDirName, dirname);
 
+    // printf("SENDING FILES LIST: FROM %d TO %d\n", htons(port2), htons(port));
+
     const int dirCharsToRemove = strlen(firstDirName) + 1;
 
     // BFS traversal using a linked list. I prefer it that way, as I have control over
@@ -179,24 +181,21 @@ int sendFilesList(Socket* clientSocket, char* dirname, int size, uint32_t ip, ui
 }
 
 // Transfer give file:
-int sendFile(Socket* clientSocket, char* dirname, int size, uint32_t ip, uint16_t port)
+int sendFile(Socket* clientSocket, char* dirname, char* basedir, int size, uint32_t ip, uint16_t port)
 {
     // Get filesize:
     struct stat fileStat;
     stat(dirname, &fileStat);
     long contentSize = fileStat.st_size;
 
-    printf("\t\tTrying to send file: %s %d\n", dirname, contentSize);
-
-    // printf("Buffer Files: %d %s\n", size, buffer);
     if(connect(clientSocket->socket, (struct sockaddr*)&clientSocket->socketAddress, sizeof(clientSocket->socketAddress)) < 0)
     {
         perror("3. Error connecting to client.");
         exit(EXIT_FAILURE);
     }
-    printf("\t\t\tHERE!\n");
 
     char* buffer = malloc(size * sizeof(char));
+    int shift = 5;
 
     strcpy(buffer, "FILE ");
 
@@ -204,27 +203,90 @@ int sendFile(Socket* clientSocket, char* dirname, int size, uint32_t ip, uint16_
     sprintf(addressString, "%x", ip);
     strcat(buffer, addressString);
     strcat(buffer, " ");
+    shift += strlen(addressString) + 1;
 
-    // Convert ip to network order:
-    // uint16_t portBinary = htons(port);
-    // Make it a string:
     char* portString = malloc(4 * sizeof(char));
     sprintf(portString, "%x", port);
     strcat(buffer, portString);
     strcat(buffer, " ");
+    shift += strlen(portString) + 1;
+
+    strcat(buffer, dirname);
+    strcat(buffer, " ");
+    shift += strlen(dirname) + 1;
+
+    strcat(buffer, basedir);
+    strcat(buffer, " ");
+    shift += strlen(basedir) + 1;
 
     char filesSizeString[12];
-    sprintf(filesSizeString, "%l", contentSize);
-    strcat(buffer, " ");
+    sprintf(filesSizeString, "%ld", contentSize);
     strcat(buffer, filesSizeString);
+    strcat(buffer, " ");
+    shift += strlen(filesSizeString) + 1;
 
     int openFile = open(dirname, O_RDONLY);
 
+    read(openFile, buffer+shift, size-shift);
+    send(clientSocket->socket, buffer, size, 0);
+
     // Get file content:
+    bzero(buffer, size);
     int bytes;
     while((bytes = read(openFile, buffer, size)))
     {
         printf("\t\t SENDING FILE DATA\n");
         send(clientSocket->socket, buffer, size, 0);
+        bzero(buffer, size);
+    }
+    close(openFile);
+}
+
+// Create directory for new file:
+void createDirectory(char* baseDir, char* newDir)
+{
+    char* fullDir = malloc(strlen(baseDir) + strlen(newDir));
+    strcpy(fullDir, baseDir);
+    strcat(fullDir, "/");
+    char* newDirCopy = malloc(strlen(newDir));
+    strcpy(newDirCopy, newDir);
+    strcat(fullDir, dirname(newDirCopy));
+    // char* fullDir = dirname(newDir);
+    printf("\tNEW DIR:%s %s\n", fullDir, baseDir);
+    struct stat dirExists;
+    // Create dir for file:
+    if (!(stat(fullDir, &dirExists) == 0 && S_ISDIR(dirExists.st_mode)))
+    {
+        mkdir(fullDir, 0777);
+    }
+    free(fullDir);
+    free(newDirCopy);
+}
+
+// Send new user notification to clients:
+void sendUserOn(LinkedList* clients, char* ip, char* port)
+{
+    char* message = malloc(22);
+    strcpy(message, "USER_ON ");
+    strcat(message, ip);
+    strcat(message, " ");
+    strcat(message, port);
+    strcat(message, " ");
+
+    Node* node = clients->head;
+    while(node != NULL)
+    {
+        uint32_t nodeIP = ((Client*)(node->item))->clientIP;
+        uint16_t nodePort = ((Client*)(node->item))->clientPort;
+        Socket* newSocket = initializeSocket(nodePort, nodeIP);
+        if(connect(newSocket->socket, (struct sockaddr*)&newSocket->socketAddress, sizeof(newSocket->socketAddress)) < 0)
+        {
+            perror("4. Error connecting to client.");
+            exit(EXIT_FAILURE);
+        }
+        send(newSocket->socket, message, 22, 0);
+        shutdown(newSocket->socket, SHUT_RDWR);
+        close(newSocket->socket);
+        node = node->next;
     }
 }

@@ -26,9 +26,10 @@ roundBuffer* initializeRoundBuffer(int size)
 // Add item to round buffer if a place is available:
 int addToRoundBuffer(roundBuffer* buffer, Item* item, Threadpool* tPool)
 {
-    if(buffer->capacity == buffer->currentSize)
+    printf("%d %d\n", buffer->capacity, buffer->currentSize);
+    while(buffer->capacity <= buffer->currentSize)
     {
-        pthread_cond_wait(&(tPool->mutexCond), &(tPool->mutexLock));
+        pthread_cond_wait(&(tPool->mutexCond2), &(tPool->mutexLock));
     }
 
     for(int i = 0; i < buffer->capacity; i++)
@@ -36,7 +37,7 @@ int addToRoundBuffer(roundBuffer* buffer, Item* item, Threadpool* tPool)
         if(buffer->items[i] == NULL)
         {
             buffer->items[i] = item;
-            buffer->currentSize++;
+            buffer->currentSize += 1;
             break;
         }
     }
@@ -55,6 +56,7 @@ Item* getRoundBufferItem(roundBuffer* buffer)
         {
             itemToReturn = buffer->items[i];
             buffer->items[i] = NULL;
+            buffer->currentSize -= 1;
             break;
         }
     }
@@ -73,7 +75,7 @@ void printRoundBuffer(roundBuffer* buffer)
         }
         else
         {
-            printf("%d: %s\n", i, buffer->items[i]->pathname);
+            printf("%d: %s %d\n", i, buffer->items[i]->pathname, htons(buffer->items[i]->port));
         }
     }
 }
@@ -87,8 +89,8 @@ Threadpool* initializeThreadpool(int numberOfThreads, roundBuffer* buffer, uint3
     newThreadpool->threads = malloc(numberOfThreads * sizeof(pthread_t));
     newThreadpool->end = 0;
     newThreadpool->buffer = buffer;
-    newThreadpool->localIP = ntohl(ip);
-    newThreadpool->localPort = ntohs(port);
+    newThreadpool->localIP = ip;
+    newThreadpool->localPort = port;
     newThreadpool->clients = clients;
 
     // Init mutex:
@@ -118,7 +120,10 @@ void* workerThread(void* arg)
         pthread_mutex_lock(&(tPool->mutexLock));
 
         // Wait until round buffer has available items: 
-        pthread_cond_wait(&(tPool->mutexCond), &(tPool->mutexLock));
+        while(tPool->buffer->currentSize <= 0)
+        {
+            pthread_cond_wait(&(tPool->mutexCond), &(tPool->mutexLock));
+        }
         printf("\n Unlock to get item.\n");
 
         // If threadpool dead, get over it:
@@ -131,6 +136,7 @@ void* workerThread(void* arg)
         Item* item = getRoundBufferItem(tPool->buffer);
         // printf("New item: %d %d\n", item->IP, item->port);
         pthread_mutex_unlock(&(tPool->mutexLock));
+        pthread_cond_broadcast(&(tPool->mutexCond2));
 
         // If there is only ip and port, ask for files:
         if(item->version == 0 && item->port != tPool->localPort)
@@ -148,14 +154,14 @@ void* workerThread(void* arg)
 
             char* addressString = malloc(8 * sizeof(char));
             // uint32_t address = htonl(item->IP);
-            sprintf(addressString, "%x", item->IP);
+            sprintf(addressString, "%x", tPool->localIP);
 
             strcat(filesRequest, addressString);
             strcat(filesRequest, " ");
 
             char* portString = malloc(4 * sizeof(char));
             // uint16_t port = htons(item->port);
-            sprintf(portString, "%x", item->port);
+            sprintf(portString, "%x", tPool->localPort);
 
             strcat(filesRequest, portString);
             strcat(filesRequest, " ");
@@ -179,14 +185,14 @@ void* workerThread(void* arg)
 
             char* addressString = malloc(8 * sizeof(char));
             // uint32_t address = htonl(item->IP);
-            sprintf(addressString, "%x", item->IP);
+            sprintf(addressString, "%x", tPool->localIP);
 
             strcat(filesRequest, addressString);
             strcat(filesRequest, " ");
 
             char* portString = malloc(4 * sizeof(char));
             // uint16_t port = htons(item->port);
-            sprintf(portString, "%x", item->port);
+            sprintf(portString, "%x", tPool->localPort);
 
             strcat(filesRequest, portString);
             strcat(filesRequest, " ");

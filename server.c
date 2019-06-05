@@ -100,18 +100,17 @@ int main(int argc, char** argv)
                 // port = ntohs(port);
                 // Search for client in clients list:
                 int found = checkClientInLinkedList(clientList, port, ip);
+                
 
-                // If it doesn't exist, add client to list:
+                // If it doesn't exist, send USER_ON signal to all clients and add client to list:
                 if(found == 1)
                 {
+                    sendUserOn(clientList, IPString, PortString);
                     Client* newClient = initializeClient(port, ip);
                     Node* newNode = initializeNode(newClient);
                     appendToLinkedList(clientList, newNode);
                     printf("Added new client to list.\n");
                 }
-
-                // char* ipPrintable;
-                // inet_ntop(AF_INET, &ip, ipPrintable, INET_ADDRSTRLEN);
             }
             // GET_CLIENTS request:
             else if(strcmp(requestString, "GET_CLIENTS") == 0)
